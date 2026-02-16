@@ -1,0 +1,30 @@
+# JClaw Gateway Configuration
+# NOTE: This is a classpath reference copy. The actual config is at ~/.jclaw/jclaw-config.yaml
+
+gateway:
+  port: 8080
+
+agents:
+  default: assistant
+  list:
+    - id: assistant
+      model: gemini-2.5-flash
+      instruction: |
+        You are a helpful AI assistant. You can read and write files,
+        and execute shell commands when needed.
+      workspace: ~/.jclaw/workspace/assistant
+
+  defaults:
+    maxConcurrent: 4
+
+bindings:
+  - match:
+      channel: cli
+    agentId: assistant
+  - match:
+      channel: webchat
+    agentId: assistant
+
+session:
+  store: ~/.jclaw/sessions
+  dmScope: main
