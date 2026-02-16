@@ -82,4 +82,4 @@ session:
 
 ## License
 
-TBD
+MIT
