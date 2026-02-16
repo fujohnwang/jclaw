@@ -134,12 +134,6 @@ public final class ConfigLoader {
         return defaultVal;
     }
 
-    private static boolean getBool(Map<String, Object> map, String key, boolean defaultVal) {
-        Object val = map.get(key);
-        if (val instanceof Boolean b) return b;
-        return defaultVal;
-    }
-
     static final String DEFAULT_CONFIG_YAML = """
             # JClaw Gateway Configuration
 
@@ -152,7 +146,7 @@ public final class ConfigLoader {
                 - id: assistant
                   provider: gemini
                   model: gemini-2.5-flash
-                  apiKeyEnvVar: GOOGLE_API_KEY
+                  # apiKeyEnvVar: GOOGLE_API_KEY  # Gemini 通过 ADK 自动读取 GOOGLE_API_KEY 环境变量，无需显式配置
                   instruction: |
                     You are a helpful AI assistant. You can read and write files,
                     and execute shell commands when needed.

@@ -73,11 +73,11 @@ gateway:
 agents:
   default: assistant
   list:
-    # Gemini 原生（无 baseUrl）
+    # Gemini 原生
     - id: assistant
       provider: gemini
       model: gemini-2.5-flash
-      apiKeyEnvVar: GOOGLE_API_KEY
+      # apiKeyEnvVar: GOOGLE_API_KEY  # Gemini 通过 ADK 自动读取 GOOGLE_API_KEY，无需显式配置
       instruction: |
         You are a helpful AI assistant.
       workspace: ~/.jclaw/workspace/assistant
