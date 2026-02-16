@@ -28,10 +28,10 @@ public record JClawConfig(
 
     public record AgentDef(
             String id,
+            String provider,
             String model,
             String apiKeyEnvVar,
             String baseUrl,
-            boolean ollama,
             String instruction,
             String workspace
     ) {}

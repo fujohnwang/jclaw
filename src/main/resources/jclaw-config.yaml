@@ -8,6 +8,7 @@ agents:
   default: assistant
   list:
     - id: assistant
+      provider: gemini
       model: gemini-2.5-flash
       apiKeyEnvVar: GOOGLE_API_KEY
       instruction: |

@@ -72,10 +72,10 @@ public final class ConfigLoader {
         for (var entry : rawList) {
             agentList.add(new JClawConfig.AgentDef(
                     getString(entry, "id", ""),
+                    getString(entry, "provider", "gemini"),
                     getString(entry, "model", "gemini-2.5-flash"),
                     getString(entry, "apiKeyEnvVar", null),
                     getString(entry, "baseUrl", null),
-                    getBool(entry, "ollama", false),
                     getString(entry, "instruction", ""),
                     getString(entry, "workspace", "")
             ));
@@ -150,6 +150,7 @@ public final class ConfigLoader {
               default: assistant
               list:
                 - id: assistant
+                  provider: gemini
                   model: gemini-2.5-flash
                   apiKeyEnvVar: GOOGLE_API_KEY
                   instruction: |

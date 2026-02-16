@@ -29,16 +29,18 @@ mvn package -Pnative -DskipTests
 agents:
   default: assistant
   list:
-    # Gemini 原生（不设 baseUrl）
+    # Gemini 原生
     - id: assistant
+      provider: gemini
       model: gemini-2.5-flash
       apiKeyEnvVar: GOOGLE_API_KEY
       instruction: |
         You are a helpful AI assistant.
 
-    # Anthropic（model 以 anthropic/ 开头，自动去掉前缀）
+    # Anthropic
     - id: claude-agent
-      model: anthropic/claude-sonnet-4-20250514
+      provider: anthropic
+      model: claude-sonnet-4-20250514
       apiKeyEnvVar: ANTHROPIC_API_KEY
       baseUrl: https://api.anthropic.com
       instruction: |
@@ -46,7 +48,8 @@ agents:
 
     # OpenRouter / OpenAI 兼容
     - id: openrouter-agent
-      model: openai/gpt-4o
+      provider: openai
+      model: gpt-4o
       apiKeyEnvVar: OPENROUTER_API_KEY
       baseUrl: https://openrouter.ai/api/v1
       instruction: |
@@ -54,9 +57,9 @@ agents:
 
     # 本地 Ollama
     - id: local-agent
+      provider: ollama
       model: qwen3:1.7b
       baseUrl: http://localhost:11434
-      ollama: true
       instruction: |
         You are a local assistant.
 ```

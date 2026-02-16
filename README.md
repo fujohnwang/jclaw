@@ -45,16 +45,14 @@ JClaw 是一个轻量级的 AI Agent 网关框架，负责将来自不同渠道�
 
 ## 模型 Provider 选择逻辑
 
-Agent 配置中通过 `baseUrl`、`model`、`ollama` 三个字段决定使用哪个 LLM Provider：
+Agent 配置中通过 `provider` 字段显式指定 LLM Provider：
 
-| 条件 | Provider | 说明 |
-|------|----------|------|
-| 无 `baseUrl` | Gemini 原生 | 通过 Google ADK 直接调用，`apiKeyEnvVar` 指向 `GOOGLE_API_KEY` |
-| `baseUrl` + `ollama: true` | Ollama | 本地模型，不需要 API Key |
-| `baseUrl` + model 以 `anthropic/` 开头 | Anthropic 原生 API | 自动去掉 `anthropic/` 前缀作为实际模型名 |
-| `baseUrl` + 其他 model | OpenAI 兼容协议 | 适用于 OpenRouter、OpenAI、vLLM 等 |
-
-model 名称采用 OpenRouter 风格的全名约定，如 `anthropic/claude-opus-4.6`、`openai/gpt-4o` 等。
+| provider | 说明 | 必需字段 |
+|----------|------|----------|
+| `gemini` (默认) | Google Gemini 原生，通过 ADK 直接调用 | `apiKeyEnvVar` |
+| `anthropic` | Anthropic 原生 API | `apiKeyEnvVar`, `baseUrl` |
+| `openai` | OpenAI 兼容协议（适用于 OpenAI、OpenRouter、vLLM 等） | `apiKeyEnvVar`, `baseUrl` |
+| `ollama` | 本地 Ollama | `baseUrl` |
 
 `apiKeyEnvVar` 配置的是环境变量名（而非 API Key 本身），运行时从环境变量读取实际值。
 
@@ -77,15 +75,17 @@ agents:
   list:
     # Gemini 原生（无 baseUrl）
     - id: assistant
+      provider: gemini
       model: gemini-2.5-flash
       apiKeyEnvVar: GOOGLE_API_KEY
       instruction: |
         You are a helpful AI assistant.
       workspace: ~/.jclaw/workspace/assistant
 
-    # Anthropic（model 以 anthropic/ 开头）
+    # Anthropic
     - id: coder
-      model: anthropic/claude-sonnet-4-20250514
+      provider: anthropic
+      model: claude-sonnet-4-20250514
       apiKeyEnvVar: ANTHROPIC_API_KEY
       baseUrl: https://api.anthropic.com
       instruction: |
@@ -93,7 +93,8 @@ agents:
 
     # OpenAI / OpenRouter（OpenAI 兼容协议）
     - id: reviewer
-      model: openai/gpt-4o
+      provider: openai
+      model: gpt-4o
       apiKeyEnvVar: OPENROUTER_API_KEY
       baseUrl: https://openrouter.ai/api/v1
       instruction: |
@@ -101,9 +102,9 @@ agents:
 
     # 本地 Ollama
     - id: local
+      provider: ollama
       model: qwen3:1.7b
       baseUrl: http://localhost:11434
-      ollama: true
       instruction: |
         You are a local assistant.
 

@@ -57,47 +57,55 @@ public final class AgentRegistry {
     }
 
     /**
-     * Resolve the LLM based on config.
-     * - No baseUrl → Gemini native (return null, use model string)
-     * - baseUrl + ollama=true → Ollama client
-     * - baseUrl + model starts with "anthropic/" → Anthropic native API
-     * - baseUrl + apiKey → OpenAI-compatible (OpenRouter, OpenAI, vLLM, etc.)
-     * Model names follow openrouter convention: "anthropic/claude-opus-4.6", "openai/gpt-4o", etc.
+     * Resolve the LLM based on provider config.
+     * - gemini → Gemini native (return null, use model string)
+     * - ollama → Ollama client via LangChain4j
+     * - anthropic → Anthropic native API via LangChain4j
+     * - openai (default for baseUrl) → OpenAI-compatible via LangChain4j
      */
     private BaseLlm resolveLlm(JClawConfig.AgentDef def, String model) {
+        String provider = def.provider() != null ? def.provider() : "gemini";
         String apiKey = resolveApiKey(def);
         String baseUrl = def.baseUrl();
 
-        // No baseUrl → Gemini native
-        if (baseUrl == null || baseUrl.isBlank()) {
-            log.info("Agent '{}': using Gemini (native), model={}", def.id(), model);
-            return null;
-        }
-
-        // Ollama
-        if (def.ollama()) {
-            log.info("Agent '{}': using Ollama at {}, model={}", def.id(), baseUrl, model);
-            return new LangChain4j(
-                    OllamaChatModel.builder().modelName(model).baseUrl(baseUrl).build());
-        }
-
-        requireApiKey(def, apiKey, model);
-
-        // Anthropic: model starts with "anthropic/"
-        if (model.startsWith("anthropic/")) {
-            String anthropicModel = model.substring("anthropic/".length());
-            log.info("Agent '{}': using Anthropic API at {}, model={}", def.id(), baseUrl, anthropicModel);
-            var builder = AnthropicChatModel.builder()
-                    .apiKey(apiKey)
-                    .modelName(anthropicModel)
-                    .baseUrl(baseUrl);
-            return new LangChain4j(builder.build(), anthropicModel);
-        }
-
-        // Everything else: OpenAI-compatible
-        log.info("Agent '{}': using OpenAI-compatible at {}, model={}", def.id(), baseUrl, model);
-        return new LangChain4j(
-                OpenAiChatModel.builder().apiKey(apiKey).modelName(model).baseUrl(baseUrl).build());
+        return switch (provider) {
+            case "gemini" -> {
+                log.info("Agent '{}': using Gemini (native), model={}", def.id(), model);
+                yield null;
+            }
+            case "ollama" -> {
+                if (baseUrl == null || baseUrl.isBlank()) {
+                    throw new IllegalStateException(
+                            "Agent '%s': provider 'ollama' requires baseUrl".formatted(def.id()));
+                }
+                log.info("Agent '{}': using Ollama at {}, model={}", def.id(), baseUrl, model);
+                yield new LangChain4j(
+                        OllamaChatModel.builder().modelName(model).baseUrl(baseUrl).build());
+            }
+            case "anthropic" -> {
+                requireApiKey(def, apiKey, model);
+                if (baseUrl == null || baseUrl.isBlank()) {
+                    throw new IllegalStateException(
+                            "Agent '%s': provider 'anthropic' requires baseUrl".formatted(def.id()));
+                }
+                log.info("Agent '{}': using Anthropic at {}, model={}", def.id(), baseUrl, model);
+                yield new LangChain4j(
+                        AnthropicChatModel.builder().apiKey(apiKey).modelName(model).baseUrl(baseUrl).build(),
+                        model);
+            }
+            case "openai" -> {
+                requireApiKey(def, apiKey, model);
+                if (baseUrl == null || baseUrl.isBlank()) {
+                    throw new IllegalStateException(
+                            "Agent '%s': provider 'openai' requires baseUrl".formatted(def.id()));
+                }
+                log.info("Agent '{}': using OpenAI-compatible at {}, model={}", def.id(), baseUrl, model);
+                yield new LangChain4j(
+                        OpenAiChatModel.builder().apiKey(apiKey).modelName(model).baseUrl(baseUrl).build());
+            }
+            default -> throw new IllegalStateException(
+                    "Agent '%s': unknown provider '%s'".formatted(def.id(), provider));
+        };
     }
 
     private String resolveApiKey(JClawConfig.AgentDef def) {
