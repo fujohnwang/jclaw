@@ -49,7 +49,7 @@ Agent 配置中通过 `provider` 字段显式指定 LLM Provider：
 
 | provider | 说明 | 必需字段 |
 |----------|------|----------|
-| `gemini` (默认) | Google Gemini 原生，通过 ADK 直接调用 | `apiKeyEnvVar` |
+| `gemini` (默认) | Google Gemini 原生，通过 ADK 直接调用 | 无（ADK 自动读取 `GOOGLE_API_KEY` 环境变量） |
 | `anthropic` | Anthropic 原生 API | `apiKeyEnvVar`, `baseUrl` |
 | `openai` | OpenAI 兼容协议（适用于 OpenAI、OpenRouter、vLLM 等） | `apiKeyEnvVar`, `baseUrl` |
 | `ollama` | 本地 Ollama | `baseUrl` |
