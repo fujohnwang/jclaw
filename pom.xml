@@ -17,6 +17,8 @@
         <maven.compiler.target>25</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <adk.version>0.5.0</adk.version>
+        <adk.langchain4j.version>0.2.0</adk.langchain4j.version>
+        <langchain4j.version>1.2.0</langchain4j.version>
         <snakeyaml.version>2.4</snakeyaml.version>
         <slf4j.version>2.0.17</slf4j.version>
     </properties>
@@ -39,6 +41,28 @@
             <groupId>org.yaml</groupId>
             <artifactId>snakeyaml</artifactId>
             <version>${snakeyaml.version}</version>
+        </dependency>
+        <!-- ADK LangChain4j bridge -->
+        <dependency>
+            <groupId>com.google.adk</groupId>
+            <artifactId>google-adk-contrib-langchain4j</artifactId>
+            <version>${adk.langchain4j.version}</version>
+        </dependency>
+        <!-- LangChain4j providers -->
+        <dependency>
+            <groupId>dev.langchain4j</groupId>
+            <artifactId>langchain4j-open-ai</artifactId>
+            <version>${langchain4j.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>dev.langchain4j</groupId>
+            <artifactId>langchain4j-anthropic</artifactId>
+            <version>${langchain4j.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>dev.langchain4j</groupId>
+            <artifactId>langchain4j-ollama</artifactId>
+            <version>${langchain4j.version}</version>
         </dependency>
         <!-- Logging -->
         <dependency>

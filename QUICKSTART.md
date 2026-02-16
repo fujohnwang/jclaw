@@ -23,6 +23,52 @@ mvn package -Pnative -DskipTests
 
 你可以直接编辑该文件来修改端口、Agent 模型、指令等。
 
+### Agent 配置示例
+
+```yaml
+agents:
+  default: assistant
+  list:
+    # Gemini 原生（不设 baseUrl）
+    - id: assistant
+      model: gemini-2.5-flash
+      apiKeyEnvVar: GOOGLE_API_KEY
+      instruction: |
+        You are a helpful AI assistant.
+
+    # Anthropic（model 以 anthropic/ 开头，自动去掉前缀）
+    - id: claude-agent
+      model: anthropic/claude-sonnet-4-20250514
+      apiKeyEnvVar: ANTHROPIC_API_KEY
+      baseUrl: https://api.anthropic.com
+      instruction: |
+        You are a coding assistant.
+
+    # OpenRouter / OpenAI 兼容
+    - id: openrouter-agent
+      model: openai/gpt-4o
+      apiKeyEnvVar: OPENROUTER_API_KEY
+      baseUrl: https://openrouter.ai/api/v1
+      instruction: |
+        You are a reviewer.
+
+    # 本地 Ollama
+    - id: local-agent
+      model: qwen3:1.7b
+      baseUrl: http://localhost:11434
+      ollama: true
+      instruction: |
+        You are a local assistant.
+```
+
+`apiKeyEnvVar` 填的是环境变量名，不是 API Key 本身。运行前确保对应环境变量已设置：
+
+```bash
+export GOOGLE_API_KEY=your-gemini-key
+export ANTHROPIC_API_KEY=your-anthropic-key
+export OPENROUTER_API_KEY=your-openrouter-key
+```
+
 ## 运行
 
 ```bash

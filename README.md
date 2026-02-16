@@ -36,11 +36,27 @@ JClaw 是一个轻量级的 AI Agent 网关框架，负责将来自不同渠道�
 
 - Java 25+（虚拟线程）
 - Google ADK 0.5.0
+- LangChain4j（多 LLM Provider 支持）
 - JDK 内置 HttpServer（WebChat，零额外依赖）
 - SnakeYAML（配置解析）
 - SLF4J（日志）
 - Maven（构建）
 - GraalVM native-image（可选，本地编译）
+
+## 模型 Provider 选择逻辑
+
+Agent 配置中通过 `baseUrl`、`model`、`ollama` 三个字段决定使用哪个 LLM Provider：
+
+| 条件 | Provider | 说明 |
+|------|----------|------|
+| 无 `baseUrl` | Gemini 原生 | 通过 Google ADK 直接调用，`apiKeyEnvVar` 指向 `GOOGLE_API_KEY` |
+| `baseUrl` + `ollama: true` | Ollama | 本地模型，不需要 API Key |
+| `baseUrl` + model 以 `anthropic/` 开头 | Anthropic 原生 API | 自动去掉 `anthropic/` 前缀作为实际模型名 |
+| `baseUrl` + 其他 model | OpenAI 兼容协议 | 适用于 OpenRouter、OpenAI、vLLM 等 |
+
+model 名称采用 OpenRouter 风格的全名约定，如 `anthropic/claude-opus-4.6`、`openai/gpt-4o` 等。
+
+`apiKeyEnvVar` 配置的是环境变量名（而非 API Key 本身），运行时从环境变量读取实际值。
 
 ## 快速开始
 
@@ -59,11 +75,38 @@ gateway:
 agents:
   default: assistant
   list:
+    # Gemini 原生（无 baseUrl）
     - id: assistant
       model: gemini-2.5-flash
+      apiKeyEnvVar: GOOGLE_API_KEY
       instruction: |
         You are a helpful AI assistant.
       workspace: ~/.jclaw/workspace/assistant
+
+    # Anthropic（model 以 anthropic/ 开头）
+    - id: coder
+      model: anthropic/claude-sonnet-4-20250514
+      apiKeyEnvVar: ANTHROPIC_API_KEY
+      baseUrl: https://api.anthropic.com
+      instruction: |
+        You are a coding assistant.
+
+    # OpenAI / OpenRouter（OpenAI 兼容协议）
+    - id: reviewer
+      model: openai/gpt-4o
+      apiKeyEnvVar: OPENROUTER_API_KEY
+      baseUrl: https://openrouter.ai/api/v1
+      instruction: |
+        You are a code reviewer.
+
+    # 本地 Ollama
+    - id: local
+      model: qwen3:1.7b
+      baseUrl: http://localhost:11434
+      ollama: true
+      instruction: |
+        You are a local assistant.
+
   defaults:
     maxConcurrent: 4
 

@@ -9,6 +9,7 @@ agents:
   list:
     - id: assistant
       model: gemini-2.5-flash
+      apiKeyEnvVar: GOOGLE_API_KEY
       instruction: |
         You are a helpful AI assistant. You can read and write files,
         and execute shell commands when needed.

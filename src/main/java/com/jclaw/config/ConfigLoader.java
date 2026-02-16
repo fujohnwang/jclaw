@@ -73,6 +73,9 @@ public final class ConfigLoader {
             agentList.add(new JClawConfig.AgentDef(
                     getString(entry, "id", ""),
                     getString(entry, "model", "gemini-2.5-flash"),
+                    getString(entry, "apiKeyEnvVar", null),
+                    getString(entry, "baseUrl", null),
+                    getBool(entry, "ollama", false),
                     getString(entry, "instruction", ""),
                     getString(entry, "workspace", "")
             ));
@@ -131,6 +134,12 @@ public final class ConfigLoader {
         return defaultVal;
     }
 
+    private static boolean getBool(Map<String, Object> map, String key, boolean defaultVal) {
+        Object val = map.get(key);
+        if (val instanceof Boolean b) return b;
+        return defaultVal;
+    }
+
     static final String DEFAULT_CONFIG_YAML = """
             # JClaw Gateway Configuration
 
@@ -142,6 +151,7 @@ public final class ConfigLoader {
               list:
                 - id: assistant
                   model: gemini-2.5-flash
+                  apiKeyEnvVar: GOOGLE_API_KEY
                   instruction: |
                     You are a helpful AI assistant. You can read and write files,
                     and execute shell commands when needed.
