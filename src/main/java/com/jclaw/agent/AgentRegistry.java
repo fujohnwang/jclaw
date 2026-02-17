@@ -30,10 +30,58 @@ public final class AgentRegistry {
 
     public AgentRegistry(JClawConfig config) {
         for (var def : config.agents().list()) {
+            validateConfig(def);
             var agent = buildAgent(def);
             agents.put(def.id(), agent);
             agentDefs.put(def.id(), def);
         }
+        log.info("AgentRegistry initialized: {} agent(s) registered", agents.size());
+    }
+
+    /**
+     * Validate agent config at startup. Fail fast on misconfiguration.
+     */
+    private void validateConfig(JClawConfig.AgentDef def) {
+        if (def.id() == null || def.id().isBlank()) {
+            throw new IllegalStateException("Agent config missing 'id'");
+        }
+        String provider = def.provider() != null ? def.provider() : "gemini";
+        switch (provider) {
+            case "gemini" -> {
+                // Gemini reads GOOGLE_API_KEY internally via ADK, just warn if not set
+                String gkey = System.getenv("GOOGLE_API_KEY");
+                if (gkey == null || gkey.isBlank()) {
+                    log.warn("Agent '{}': provider 'gemini' — env var GOOGLE_API_KEY is not set, ADK may fail at runtime", def.id());
+                }
+            }
+            case "openai", "anthropic" -> {
+                if (def.baseUrl() == null || def.baseUrl().isBlank()) {
+                    throw new IllegalStateException(
+                            "Agent '%s': provider '%s' requires 'baseUrl'".formatted(def.id(), provider));
+                }
+                if (def.apiKeyEnvVar() == null || def.apiKeyEnvVar().isBlank()) {
+                    throw new IllegalStateException(
+                            "Agent '%s': provider '%s' requires 'apiKeyEnvVar'".formatted(def.id(), provider));
+                }
+                String apiKey = System.getenv(def.apiKeyEnvVar());
+                if (apiKey == null || apiKey.isBlank()) {
+                    throw new IllegalStateException(
+                            "Agent '%s': env var '%s' is not set".formatted(def.id(), def.apiKeyEnvVar()));
+                }
+            }
+            case "ollama" -> {
+                if (def.baseUrl() == null || def.baseUrl().isBlank()) {
+                    throw new IllegalStateException(
+                            "Agent '%s': provider 'ollama' requires 'baseUrl'".formatted(def.id()));
+                }
+            }
+            default -> throw new IllegalStateException(
+                    "Agent '%s': unknown provider '%s' (valid: gemini, openai, anthropic, ollama)".formatted(def.id(), provider));
+        }
+        if (def.model() == null || def.model().isBlank()) {
+            throw new IllegalStateException("Agent '%s': missing 'model'".formatted(def.id()));
+        }
+        log.debug("Agent '{}' config validated: provider={}, model={}", def.id(), provider, def.model());
     }
 
     private BaseAgent buildAgent(JClawConfig.AgentDef def) {

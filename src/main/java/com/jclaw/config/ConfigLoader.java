@@ -62,7 +62,10 @@ public final class ConfigLoader {
 
         var gatewayMap = getMap(root, "gateway");
         var gateway = new JClawConfig.GatewayConfig(
-                getInt(gatewayMap, "port", 8080)
+                getInt(gatewayMap, "port", 8080),
+                getString(gatewayMap, "adminToken", "jclaw-admin"),
+                getInt(gatewayMap, "agentTimeoutSeconds", 60),
+                getInt(gatewayMap, "shutdownTimeoutSeconds", 10)
         );
 
         var agentsMap = getMap(root, "agents");
@@ -139,6 +142,9 @@ public final class ConfigLoader {
 
             gateway:
               port: 8080
+              adminToken: jclaw-admin
+              agentTimeoutSeconds: 60
+              shutdownTimeoutSeconds: 10
 
             agents:
               default: assistant
@@ -156,9 +162,6 @@ public final class ConfigLoader {
                 maxConcurrent: 4
 
             bindings:
-              - match:
-                  channel: cli
-                agentId: assistant
               - match:
                   channel: webchat
                 agentId: assistant

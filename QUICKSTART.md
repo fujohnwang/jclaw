@@ -75,14 +75,8 @@ export OPENROUTER_API_KEY=your-openrouter-key
 ## 运行
 
 ```bash
-# 默认启动 CLI + WebChat 双渠道
+# 启动 WebChat 服务
 java -jar target/jclaw-0.1.0-SNAPSHOT.jar
-
-# 仅启动 WebChat
-java -jar target/jclaw-0.1.0-SNAPSHOT.jar --webchat-only
-
-# 仅启动 CLI
-java -jar target/jclaw-0.1.0-SNAPSHOT.jar --cli-only
 
 # 指定配置文件
 java -jar target/jclaw-0.1.0-SNAPSHOT.jar --config /path/to/config.yaml
@@ -92,12 +86,10 @@ java -jar target/jclaw-0.1.0-SNAPSHOT.jar --config /path/to/config.yaml
 
 ```bash
 ./target/jclaw
-./target/jclaw --webchat-only
 ```
 
 ## 使用
 
-- CLI：启动后直接在终端输入消息，输入 `quit` 退出
 - WebChat：浏览器打开 `http://localhost:8080`（端口取决于配置文件中 `gateway.port`）
 
 ## 目录结构

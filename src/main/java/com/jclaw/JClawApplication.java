@@ -1,36 +1,31 @@
 package com.jclaw;
 
-import com.jclaw.channel.CliChannel;
 import com.jclaw.channel.WebChatChannel;
 import com.jclaw.config.ConfigLoader;
 import com.jclaw.config.JClawConfig;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.nio.file.Path;
 
 /**
  * JClaw — Java port of OpenClaw core.
- * Entry point: loads config from ~/.jclaw/, creates gateway, starts channels.
+ * Entry point: loads config from ~/.jclaw/, creates gateway, starts WebChat server.
  *
  * Usage:
- *   jclaw                        → starts both CLI + WebChat (default)
- *   jclaw --cli-only             → starts CLI channel only
- *   jclaw --webchat-only         → starts WebChat channel only
- *   jclaw --config path          → use custom config file
+ *   java -jar jclaw.jar                  → starts WebChat server
+ *   java -jar jclaw.jar --config path    → use custom config file
  */
 public final class JClawApplication {
 
+    private static final Logger log = LoggerFactory.getLogger(JClawApplication.class);
+
     public static void main(String[] args) {
-        boolean cli = true;
-        boolean webchat = true;
         String configPath = null;
 
         for (int i = 0; i < args.length; i++) {
-            switch (args[i]) {
-                case "--cli-only" -> { cli = true; webchat = false; }
-                case "--webchat-only" -> { cli = false; webchat = true; }
-                case "--config" -> {
-                    if (i + 1 < args.length) configPath = args[++i];
-                }
+            if ("--config".equals(args[i]) && i + 1 < args.length) {
+                configPath = args[++i];
             }
         }
 
@@ -50,23 +45,19 @@ public final class JClawApplication {
         }
 
         var gateway = new Gateway(config);
+        int port = config.gateway().port();
+        String adminToken = config.gateway().adminToken();
 
-        // Start WebChat in a background virtual thread (non-blocking)
-        if (webchat) {
-            int port = config.gateway().port();
-            Thread.startVirtualThread(() -> gateway.start(new WebChatChannel(port)));
-        }
+        final WebChatChannel[] holder = new WebChatChannel[1];
+        var channel = new WebChatChannel(port, adminToken, () -> {
+            log.info("Initiating graceful shutdown...");
+            holder[0].stop();        // 1. Stop accepting new HTTP requests
+            gateway.shutdown();      // 2. Drain in-flight agent tasks, close executor
+            log.info("All resources released. Exiting.");
+            System.exit(0);
+        });
+        holder[0] = channel;
 
-        // Start CLI on the main thread (blocks until quit)
-        if (cli) {
-            gateway.start(new CliChannel());
-        } else {
-            // If no CLI, block main thread to keep the process alive
-            try {
-                Thread.currentThread().join();
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-        }
+        gateway.start(channel);
     }
 }

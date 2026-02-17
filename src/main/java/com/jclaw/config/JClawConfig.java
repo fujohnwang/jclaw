@@ -12,8 +12,8 @@ public record JClawConfig(
         List<BindingConfig> bindings,
         SessionConfig session
 ) {
-    public record GatewayConfig(int port) {
-        public GatewayConfig() { this(8080); }
+    public record GatewayConfig(int port, String adminToken, int agentTimeoutSeconds, int shutdownTimeoutSeconds) {
+        public GatewayConfig() { this(8080, "jclaw-admin", 60, 10); }
     }
 
     public record AgentsConfig(

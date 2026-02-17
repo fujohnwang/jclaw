@@ -1,10 +1,11 @@
 # JClaw 开发备忘
 
-## CLI quit 行为
+## CLI 已移除
 
-当前 CLI 模式下输入 `quit` 会退出整个 JVM 进程，包括同时运行的 WebChat 渠道。
+CLI 渠道已从主项目移除。JClaw 定位为服务端程序，CLI 如有需要应作为独立项目实现。
 
-后续可考虑：
-- `quit` 仅退出 CLI，WebChat 继续服务
-- 增加 `shutdown` 命令用于关闭整个进程
-- 或通过 ShutdownHook 优雅关闭所有 channel
+## 待办
+
+- 模型参数配置（temperature、maxTokens、topP 等）
+- 启动时模型可达性校验
+- CLI quit 退出后进程不终止的问题已通过移除 CLI 解决

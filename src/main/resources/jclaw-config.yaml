@@ -3,6 +3,7 @@
 
 gateway:
   port: 8080
+  adminToken: jclaw-admin
 
 agents:
   default: assistant
@@ -20,9 +21,6 @@ agents:
     maxConcurrent: 4
 
 bindings:
-  - match:
-      channel: cli
-    agentId: assistant
   - match:
       channel: webchat
     agentId: assistant

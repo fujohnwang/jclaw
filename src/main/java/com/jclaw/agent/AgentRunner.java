@@ -13,8 +13,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Semaphore;
+import java.util.concurrent.*;
 
 /**
  * Orchestrates agent runs with concurrency control.
@@ -27,13 +26,19 @@ public final class AgentRunner {
 
     private final AgentRegistry registry;
     private final SessionManager sessionManager;
+    private final long agentTimeoutSeconds;
+    private final long shutdownTimeoutSeconds;
     private final Semaphore globalConcurrency;
     private final Map<String, Semaphore> sessionLocks = new ConcurrentHashMap<>();
     private final Map<String, InMemoryRunner> runners = new ConcurrentHashMap<>();
+    private final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
 
-    public AgentRunner(AgentRegistry registry, SessionManager sessionManager, int maxConcurrent) {
+    public AgentRunner(AgentRegistry registry, SessionManager sessionManager,
+                       int maxConcurrent, int agentTimeoutSeconds, int shutdownTimeoutSeconds) {
         this.registry = registry;
         this.sessionManager = sessionManager;
+        this.agentTimeoutSeconds = agentTimeoutSeconds;
+        this.shutdownTimeoutSeconds = shutdownTimeoutSeconds;
         this.globalConcurrency = new Semaphore(maxConcurrent);
     }
 
@@ -54,7 +59,19 @@ public final class AgentRunner {
         try {
             globalConcurrency.acquireUninterruptibly();
             try {
-                return executeAgentTurn(agentId, sessionKey, userMessage);
+                Future<String> future = executor.submit(() -> executeAgentTurn(agentId, sessionKey, userMessage));
+                try {
+                    return future.get(agentTimeoutSeconds, TimeUnit.SECONDS);
+                } catch (TimeoutException e) {
+                    future.cancel(true);
+                    log.error("Agent timeout after {}s: agent={}, session={}", agentTimeoutSeconds, agentId, sessionKey);
+                    throw new RuntimeException("Agent '%s' timed out after %ds".formatted(agentId, agentTimeoutSeconds));
+                } catch (ExecutionException e) {
+                    throw new RuntimeException(e.getCause() != null ? e.getCause().getMessage() : e.getMessage(), e);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new RuntimeException("Agent execution interrupted", e);
+                }
             } finally {
                 globalConcurrency.release();
             }
@@ -64,46 +81,69 @@ public final class AgentRunner {
     }
 
     private String executeAgentTurn(String agentId, String sessionKey, String userMessage) {
-        // Record user message
-        sessionManager.append(sessionKey, SessionEntry.user(userMessage));
+        try {
+            // Record user message
+            sessionManager.append(sessionKey, SessionEntry.user(userMessage));
 
-        var runner = runners.computeIfAbsent(agentId, id -> {
-            var agent = registry.getAgent(id);
-            return new InMemoryRunner(agent);
-        });
+            var runner = runners.computeIfAbsent(agentId, id -> {
+                var agent = registry.getAgent(id);
+                return new InMemoryRunner(agent);
+            });
 
-        // Create or reuse ADK session (keyed by sessionKey as userId for simplicity)
-        Session session = runner.sessionService()
-                .createSession(runner.appName(), sessionKey)
-                .blockingGet();
+            // Create or reuse ADK session (keyed by sessionKey as userId for simplicity)
+            Session session = runner.sessionService()
+                    .createSession(runner.appName(), sessionKey)
+                    .blockingGet();
 
-        Content userMsg = Content.fromParts(Part.fromText(userMessage));
-        RunConfig runConfig = RunConfig.builder().build();
+            Content userMsg = Content.fromParts(Part.fromText(userMessage));
+            RunConfig runConfig = RunConfig.builder().build();
 
-        Flowable<Event> events = runner.runAsync(session.userId(), session.id(), userMsg, runConfig);
+            Flowable<Event> events = runner.runAsync(session.userId(), session.id(), userMsg, runConfig);
 
-        // Collect final response
-        var responseBuilder = new StringBuilder();
-        events.blockingForEach(event -> {
-            if (event.finalResponse()) {
-                String text = event.stringifyContent();
-                if (text != null && !text.isBlank()) {
-                    responseBuilder.append(text);
+            // Collect final response
+            var responseBuilder = new StringBuilder();
+            events.blockingForEach(event -> {
+                if (event.finalResponse()) {
+                    String text = event.stringifyContent();
+                    if (text != null && !text.isBlank()) {
+                        responseBuilder.append(text);
+                    }
                 }
+            });
+
+            String response = responseBuilder.toString().trim();
+            if (response.isEmpty()) {
+                response = "[no response from agent]";
             }
-        });
 
-        String response = responseBuilder.toString().trim();
-        if (response.isEmpty()) {
-            response = "[no response from agent]";
+            // Record assistant response
+            sessionManager.append(sessionKey, SessionEntry.assistant(response));
+
+            log.debug("Agent turn complete: agent={}, session={}, responseLen={}",
+                    agentId, sessionKey, response.length());
+
+            return response;
+        } catch (Exception e) {
+            log.error("Agent execution failed: agent={}, session={}, error={}", agentId, sessionKey, e.getMessage(), e);
+            throw new RuntimeException("Agent '%s' failed: %s".formatted(agentId, e.getMessage()), e);
         }
+    }
 
-        // Record assistant response
-        sessionManager.append(sessionKey, SessionEntry.assistant(response));
-
-        log.debug("Agent turn complete: agent={}, session={}, responseLen={}",
-                agentId, sessionKey, response.length());
-
-        return response;
+    /**
+     * Gracefully shut down the executor, waiting for in-flight tasks.
+     */
+    public void shutdown() {
+        log.info("AgentRunner shutting down...");
+        executor.shutdown();
+        try {
+            if (!executor.awaitTermination(shutdownTimeoutSeconds, TimeUnit.SECONDS)) {
+                executor.shutdownNow();
+                log.warn("AgentRunner forced shutdown after {}s timeout", shutdownTimeoutSeconds);
+            }
+        } catch (InterruptedException e) {
+            executor.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
+        log.info("AgentRunner shut down complete");
     }
 }

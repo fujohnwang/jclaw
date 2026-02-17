@@ -13,9 +13,7 @@ JClaw 是一个轻量级的 AI Agent 网关框架，负责将来自不同渠道�
            │                                            │
            │                                      SessionManager
            │
-     ┌─────┴─────┐
-     │            │
-  CliChannel  WebChatChannel
+     WebChatChannel
 ```
 
 - **Channel** — 消息接入层，定义用户交互界面（CLI 终端、Web 聊天页面等）
@@ -29,7 +27,6 @@ JClaw 是一个轻量级的 AI Agent 网关框架，负责将来自不同渠道�
 
 | 渠道 | 说明 |
 |------|------|
-| CLI | 终端命令行交互 |
 | WebChat | 浏览器聊天界面（内置 HTTP 服务器） |
 
 ## 技术栈

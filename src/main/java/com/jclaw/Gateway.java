@@ -32,7 +32,9 @@ public final class Gateway {
         this.agentRunner = new AgentRunner(
                 agentRegistry,
                 sessionManager,
-                config.agents().defaults().maxConcurrent()
+                config.agents().defaults().maxConcurrent(),
+                config.gateway().agentTimeoutSeconds(),
+                config.gateway().shutdownTimeoutSeconds()
         );
     }
 
@@ -48,6 +50,15 @@ public final class Gateway {
                 config.agents().list().stream().map(JClawConfig.AgentDef::id).toList());
 
         channel.start((senderId, text) -> handleMessage(channel.id(), senderId, text));
+    }
+
+    /**
+     * Gracefully shut down all gateway resources.
+     */
+    public void shutdown() {
+        log.info("Gateway shutting down...");
+        agentRunner.shutdown();
+        log.info("Gateway shut down complete");
     }
 
     /**
