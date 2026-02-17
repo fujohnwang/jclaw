@@ -33,7 +33,8 @@ public record JClawConfig(
             String apiKeyEnvVar,
             String baseUrl,
             String instruction,
-            String workspace
+            String workspace,
+            List<String> skills
     ) {}
 
     public record AgentDefaults(int maxConcurrent) {
@@ -41,18 +42,10 @@ public record JClawConfig(
     }
 
     public record BindingConfig(
-            MatchCondition match,
-            String agentId
-    ) {}
-
-    public record MatchCondition(
+            String id,
             String channel,
-            String accountId,
-            String peerId,
-            String peerKind,
-            String guildId,
-            String teamId,
-            List<String> roles
+            String agentId,
+            Map<String, String> filter
     ) {}
 
     public record SessionConfig(

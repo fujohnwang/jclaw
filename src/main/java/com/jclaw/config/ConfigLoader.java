@@ -35,6 +35,11 @@ public final class ConfigLoader {
         if (!Files.exists(sessionsDir)) {
             Files.createDirectories(sessionsDir);
         }
+        // Ensure skills directory
+        Path skillsDir = JCLAW_HOME.resolve("skills");
+        if (!Files.exists(skillsDir)) {
+            Files.createDirectories(skillsDir);
+        }
         // Write default config if not present
         if (!Files.exists(DEFAULT_CONFIG_PATH)) {
             Files.writeString(DEFAULT_CONFIG_PATH, DEFAULT_CONFIG_YAML);
@@ -80,7 +85,8 @@ public final class ConfigLoader {
                     getString(entry, "apiKeyEnvVar", null),
                     getString(entry, "baseUrl", null),
                     getString(entry, "instruction", ""),
-                    getString(entry, "workspace", "")
+                    getString(entry, "workspace", ""),
+                    getStringList(entry, "skills")
             ));
         }
         var defaultsMap = getMap(agentsMap, "defaults");
@@ -92,20 +98,17 @@ public final class ConfigLoader {
         var bindingsList = new ArrayList<JClawConfig.BindingConfig>();
         var rawBindings = (List<Map<String, Object>>) root.getOrDefault("bindings", List.of());
         for (var b : rawBindings) {
-            var matchMap = getMap(b, "match");
-            var roles = matchMap.containsKey("roles")
-                    ? ((List<String>) matchMap.get("roles"))
-                    : List.<String>of();
-            var match = new JClawConfig.MatchCondition(
-                    getString(matchMap, "channel", null),
-                    getString(matchMap, "accountId", null),
-                    getString(matchMap, "peerId", null),
-                    getString(matchMap, "peerKind", null),
-                    getString(matchMap, "guildId", null),
-                    getString(matchMap, "teamId", null),
-                    roles
-            );
-            bindingsList.add(new JClawConfig.BindingConfig(match, getString(b, "agentId", "")));
+            var filterMap = getMap(b, "filter");
+            var filter = new java.util.HashMap<String, String>();
+            for (var entry : filterMap.entrySet()) {
+                filter.put(entry.getKey(), entry.getValue() != null ? entry.getValue().toString() : null);
+            }
+            bindingsList.add(new JClawConfig.BindingConfig(
+                    getString(b, "id", ""),
+                    getString(b, "channel", ""),
+                    getString(b, "agentId", ""),
+                    filter.isEmpty() ? null : filter
+            ));
         }
 
         var sessionMap = getMap(root, "session");
@@ -137,6 +140,15 @@ public final class ConfigLoader {
         return defaultVal;
     }
 
+    @SuppressWarnings("unchecked")
+    private static List<String> getStringList(Map<String, Object> map, String key) {
+        Object val = map.get(key);
+        if (val instanceof List<?> list) {
+            return list.stream().map(Object::toString).toList();
+        }
+        return List.of();
+    }
+
     static final String DEFAULT_CONFIG_YAML = """
             # JClaw Gateway Configuration
 
@@ -157,13 +169,14 @@ public final class ConfigLoader {
                     You are a helpful AI assistant. You can read and write files,
                     and execute shell commands when needed.
                   workspace: ~/.jclaw/workspace/assistant
+                  # skills: [all]  # 可用 skills 列表，默认为空（不加载任何 skill），设为 [all] 加载全部
 
               defaults:
                 maxConcurrent: 4
 
             bindings:
-              - match:
-                  channel: webchat
+              - id: webchat-assistant
+                channel: webchat
                 agentId: assistant
 
             session:

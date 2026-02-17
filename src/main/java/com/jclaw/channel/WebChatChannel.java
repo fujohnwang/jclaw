@@ -216,6 +216,12 @@ public final class WebChatChannel implements Channel {
   #send:hover { background: #1a4a8a; }
   #send:disabled { opacity: 0.5; cursor: not-allowed; }
   .typing { align-self: flex-start; color: #888; font-size: 13px; padding: 4px 14px; }
+  .toast { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 10px 24px;
+           border-radius: 8px; font-size: 14px; z-index: 999; opacity: 1;
+           transition: opacity 0.5s ease; pointer-events: none; }
+  .toast.error { background: #c0392b; color: #fff; }
+  .toast.success { background: #27ae60; color: #fff; }
+  .toast.fade-out { opacity: 0; }
 </style>
 </head>
 <body>
@@ -238,6 +244,16 @@ function addMsg(text, cls) {
   msgs.appendChild(d);
   msgs.scrollTop = msgs.scrollHeight;
   return d;
+}
+
+function showToast(text, type, duration) {
+  duration = duration || 3000;
+  const t = document.createElement('div');
+  t.className = 'toast ' + type;
+  t.textContent = text;
+  document.body.appendChild(t);
+  setTimeout(() => { t.classList.add('fade-out'); }, duration - 500);
+  setTimeout(() => { t.remove(); }, duration);
 }
 
 async function send() {
@@ -291,18 +307,18 @@ document.getElementById('shutdown-btn').addEventListener('click', async () => {
     });
     const data = await res.json();
     if (data.error) {
-      addMsg('Shutdown failed: ' + data.error, 'error');
+      showToast(data.error, 'error');
       btn.disabled = false;
       btn.textContent = 'Shutdown';
     } else {
-      addMsg('Server is shutting down...', 'error');
+      showToast('Server is shutting down...', 'success', 5000);
       input.disabled = true;
       sendBtn.disabled = true;
       btn.style.borderColor = '#555';
       btn.style.color = '#555';
     }
   } catch (e) {
-    addMsg('Shutdown request failed: ' + e.message, 'error');
+    showToast('Shutdown request failed: ' + e.message, 'error');
     btn.disabled = false;
     btn.textContent = 'Shutdown';
   }

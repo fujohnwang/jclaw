@@ -5,10 +5,12 @@ import com.jclaw.agent.AgentRunner;
 import com.jclaw.channel.Channel;
 import com.jclaw.config.JClawConfig;
 import com.jclaw.routing.RouteResolver;
-import com.jclaw.routing.RouteResolver.MessageContext;
 import com.jclaw.session.SessionManager;
+import com.jclaw.skill.SkillRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.nio.file.Path;
 
 /**
  * The Gateway — central orchestrator that wires channels, routing, sessions, and agents together.
@@ -21,6 +23,7 @@ public final class Gateway {
     private final JClawConfig config;
     private final RouteResolver router;
     private final SessionManager sessionManager;
+    private final SkillRegistry skillRegistry;
     private final AgentRegistry agentRegistry;
     private final AgentRunner agentRunner;
 
@@ -28,7 +31,9 @@ public final class Gateway {
         this.config = config;
         this.router = new RouteResolver(config);
         this.sessionManager = new SessionManager(config.session());
-        this.agentRegistry = new AgentRegistry(config);
+        this.skillRegistry = new SkillRegistry(
+                Path.of(System.getProperty("user.home"), ".jclaw", "skills"));
+        this.agentRegistry = new AgentRegistry(config, skillRegistry);
         this.agentRunner = new AgentRunner(
                 agentRegistry,
                 sessionManager,
@@ -62,36 +67,28 @@ public final class Gateway {
     }
 
     /**
-     * Full message handling pipeline:
-     * 1. Build message context
-     * 2. Route to agent via bindings
-     * 3. Resolve session key
-     * 4. Run agent turn (with concurrency control)
-     * 5. Return response
+     * Message handling pipeline:
+     * 1. Route to agent by channel
+     * 2. Resolve session key
+     * 3. Run agent turn (with concurrency control)
      */
     private String handleMessage(String channelId, String senderId, String text) {
-        // 1. Build routing context
-        var ctx = new MessageContext(
-                channelId, "default", null, "direct",
-                null, null, java.util.List.of(), senderId
-        );
-
-        // 2. Resolve target agent
-        String agentId = router.resolve(ctx);
+        // 1. Resolve target agent by channel
+        String agentId = router.resolve(channelId);
         if (!agentRegistry.hasAgent(agentId)) {
             log.warn("Routed to unknown agent '{}', falling back to default", agentId);
             agentId = config.agents().defaultAgent();
         }
 
-        // 3. Resolve session key
+        // 2. Resolve session key
         String sessionKey = sessionManager.resolveSessionKey(
-                agentId, channelId, ctx.peerKind(), senderId
+                agentId, channelId, "direct", senderId
         );
 
         log.debug("Message: channel={}, sender={}, agent={}, session={}",
                 channelId, senderId, agentId, sessionKey);
 
-        // 4. Run agent turn (virtual thread handles blocking)
+        // 3. Run agent turn (virtual thread handles blocking)
         return agentRunner.run(agentId, sessionKey, text);
     }
 }
