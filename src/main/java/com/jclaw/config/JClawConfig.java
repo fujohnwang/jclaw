@@ -8,6 +8,7 @@ import java.util.Map;
  */
 public record JClawConfig(
         GatewayConfig gateway,
+        List<ModelDef> models,
         AgentsConfig agents,
         List<BindingConfig> bindings,
         SessionConfig session
@@ -16,22 +17,25 @@ public record JClawConfig(
         public GatewayConfig() { this(8080, "jclaw-admin", 60, 10); }
     }
 
+    public record ModelDef(
+            String id,
+            String provider,
+            String model,
+            String apiKeyEnvVar,
+            String baseUrl
+    ) {}
+
     public record AgentsConfig(
             String defaultAgent,
             List<AgentDef> list,
             AgentDefaults defaults
     ) {
         public AgentsConfig() { this("assistant", List.of(), new AgentDefaults()); }
-
-        // Custom key mapping: "default" in YAML → defaultAgent field
     }
 
     public record AgentDef(
             String id,
-            String provider,
-            String model,
-            String apiKeyEnvVar,
-            String baseUrl,
+            String modelId,
             String instruction,
             String workspace,
             List<String> skills

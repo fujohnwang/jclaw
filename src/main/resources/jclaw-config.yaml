@@ -4,25 +4,38 @@
 gateway:
   port: 8080
   adminToken: jclaw-admin
+  agentTimeoutSeconds: 60
+  shutdownTimeoutSeconds: 10
+
+models:
+  - id: gemini-flash
+    provider: gemini
+    model: gemini-2.5-flash
+    # apiKeyEnvVar: GOOGLE_API_KEY  # Gemini 通过 ADK 自动读取，无需显式配置
+
+  # - id: gpt4o
+  #   provider: openai
+  #   model: gpt-4o
+  #   apiKeyEnvVar: OPENAI_API_KEY
+  #   baseUrl: https://api.openai.com/v1
 
 agents:
   default: assistant
   list:
     - id: assistant
-      provider: gemini
-      model: gemini-2.5-flash
-      # apiKeyEnvVar: GOOGLE_API_KEY  # Gemini 通过 ADK 自动读取 GOOGLE_API_KEY 环境变量，无需显式配置
+      modelId: gemini-flash
       instruction: |
         You are a helpful AI assistant. You can read and write files,
         and execute shell commands when needed.
       workspace: ~/.jclaw/workspace/assistant
+      # skills: [all]
 
   defaults:
     maxConcurrent: 4
 
 bindings:
-  - match:
-      channel: webchat
+  - id: webchat-assistant
+    channel: webchat
     agentId: assistant
 
 session:

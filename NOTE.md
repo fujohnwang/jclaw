@@ -26,6 +26,10 @@ bindings:
 - 将来实现 filter 匹配逻辑时，需在 `RouteResolver.resolve()` 中增加对 filter 字段的评估，匹配维度包括但不限于：peerId、teamId、roles 等
 - binding 的 `id` 用于日志追踪和管理标识
 
+## 模型与 Agent 配置分离
+
+模型定义（`models`）和 Agent 配置（`agents`）分离，Agent 通过 `modelId` 引用模型定义。多个 Agent 可复用同一个模型配置，避免重复。
+
 ## 待办
 
 - 模型参数配置（temperature、maxTokens、topP 等）

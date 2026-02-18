@@ -73,6 +73,19 @@ public final class ConfigLoader {
                 getInt(gatewayMap, "shutdownTimeoutSeconds", 10)
         );
 
+        // Parse models
+        var modelList = new ArrayList<JClawConfig.ModelDef>();
+        var rawModels = (List<Map<String, Object>>) root.getOrDefault("models", List.of());
+        for (var entry : rawModels) {
+            modelList.add(new JClawConfig.ModelDef(
+                    getString(entry, "id", ""),
+                    getString(entry, "provider", "gemini"),
+                    getString(entry, "model", ""),
+                    getString(entry, "apiKeyEnvVar", null),
+                    getString(entry, "baseUrl", null)
+            ));
+        }
+
         var agentsMap = getMap(root, "agents");
         String defaultAgent = getString(agentsMap, "default", "assistant");
         var agentList = new ArrayList<JClawConfig.AgentDef>();
@@ -80,10 +93,7 @@ public final class ConfigLoader {
         for (var entry : rawList) {
             agentList.add(new JClawConfig.AgentDef(
                     getString(entry, "id", ""),
-                    getString(entry, "provider", "gemini"),
-                    getString(entry, "model", "gemini-2.5-flash"),
-                    getString(entry, "apiKeyEnvVar", null),
-                    getString(entry, "baseUrl", null),
+                    getString(entry, "modelId", ""),
                     getString(entry, "instruction", ""),
                     getString(entry, "workspace", ""),
                     getStringList(entry, "skills")
@@ -117,7 +127,7 @@ public final class ConfigLoader {
                 getString(sessionMap, "dmScope", "main")
         );
 
-        return new JClawConfig(gateway, agents, bindingsList, session);
+        return new JClawConfig(gateway, modelList, agents, bindingsList, session);
     }
 
     @SuppressWarnings("unchecked")
@@ -158,18 +168,28 @@ public final class ConfigLoader {
               agentTimeoutSeconds: 60
               shutdownTimeoutSeconds: 10
 
+            models:
+              - id: gemini-flash
+                provider: gemini
+                model: gemini-2.5-flash
+                # apiKeyEnvVar: GOOGLE_API_KEY  # Gemini 通过 ADK 自动读取，无需显式配置
+
+              # - id: gpt4o
+              #   provider: openai
+              #   model: gpt-4o
+              #   apiKeyEnvVar: OPENAI_API_KEY
+              #   baseUrl: https://api.openai.com/v1
+
             agents:
               default: assistant
               list:
                 - id: assistant
-                  provider: gemini
-                  model: gemini-2.5-flash
-                  # apiKeyEnvVar: GOOGLE_API_KEY  # Gemini 通过 ADK 自动读取 GOOGLE_API_KEY 环境变量，无需显式配置
+                  modelId: gemini-flash
                   instruction: |
                     You are a helpful AI assistant. You can read and write files,
                     and execute shell commands when needed.
                   workspace: ~/.jclaw/workspace/assistant
-                  # skills: [all]  # 可用 skills 列表，默认为空（不加载任何 skill），设为 [all] 加载全部
+                  # skills: [all]  # 可用 skills 列表，默认为空，设为 [all] 加载全部
 
               defaults:
                 maxConcurrent: 4

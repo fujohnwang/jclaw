@@ -21,45 +21,59 @@ mvn package -Pnative -DskipTests
 
 首次运行时，JClaw 会自动创建工作目录 `~/.jclaw/` 并生成默认配置文件 `~/.jclaw/jclaw-config.yaml`。
 
-你可以直接编辑该文件来修改端口、Agent 模型、指令等。
+配置分为两层：`models` 定义模型，`agents` 引用模型。
 
-### Agent 配置示例
+### 模型定义
+
+```yaml
+models:
+  - id: gemini-flash
+    provider: gemini
+    model: gemini-2.5-flash
+
+  - id: claude
+    provider: anthropic
+    model: claude-sonnet-4-20250514
+    apiKeyEnvVar: ANTHROPIC_API_KEY
+    baseUrl: https://api.anthropic.com
+
+  - id: gpt4o
+    provider: openai
+    model: gpt-4o
+    apiKeyEnvVar: OPENROUTER_API_KEY
+    baseUrl: https://openrouter.ai/api/v1
+
+  - id: local-qwen
+    provider: ollama
+    model: qwen3:1.7b
+    baseUrl: http://localhost:11434
+```
+
+### Agent 配置
+
+Agent 通过 `modelId` 引用模型定义，多个 agent 可复用同一个模型：
 
 ```yaml
 agents:
   default: assistant
   list:
-    # Gemini 原生
     - id: assistant
-      provider: gemini
-      model: gemini-2.5-flash
-      # apiKeyEnvVar: GOOGLE_API_KEY  # Gemini 通过 ADK 自动读取 GOOGLE_API_KEY，无需显式配置
+      modelId: gemini-flash
       instruction: |
         You are a helpful AI assistant.
 
-    # Anthropic
-    - id: claude-agent
-      provider: anthropic
-      model: claude-sonnet-4-20250514
-      apiKeyEnvVar: ANTHROPIC_API_KEY
-      baseUrl: https://api.anthropic.com
+    - id: coder
+      modelId: claude
       instruction: |
         You are a coding assistant.
 
-    # OpenRouter / OpenAI 兼容
-    - id: openrouter-agent
-      provider: openai
-      model: gpt-4o
-      apiKeyEnvVar: OPENROUTER_API_KEY
-      baseUrl: https://openrouter.ai/api/v1
+    - id: reviewer
+      modelId: gpt4o
       instruction: |
-        You are a reviewer.
+        You are a code reviewer.
 
-    # 本地 Ollama
     - id: local-agent
-      provider: ollama
-      model: qwen3:1.7b
-      baseUrl: http://localhost:11434
+      modelId: local-qwen
       instruction: |
         You are a local assistant.
 ```
@@ -98,6 +112,7 @@ java -jar target/jclaw-0.1.0-SNAPSHOT.jar --config /path/to/config.yaml
 ~/.jclaw/
 ├── jclaw-config.yaml    # 配置文件
 ├── sessions/            # 会话持久化
+├── skills/              # Agent Skills (agentskills.io)
 └── workspace/           # Agent 工作区
     └── assistant/
 ```

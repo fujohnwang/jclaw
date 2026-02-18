@@ -33,70 +33,86 @@ public final class AgentRegistry {
 
     private final Map<String, BaseAgent> agents = new ConcurrentHashMap<>();
     private final Map<String, JClawConfig.AgentDef> agentDefs = new ConcurrentHashMap<>();
+    private final Map<String, JClawConfig.ModelDef> modelDefs = new ConcurrentHashMap<>();
     private final SkillRegistry skillRegistry;
     private volatile long lastSkillVersion;
 
     public AgentRegistry(JClawConfig config, SkillRegistry skillRegistry) {
         this.skillRegistry = skillRegistry;
         this.lastSkillVersion = skillRegistry.version();
+        // Index models by id
+        for (var m : config.models()) {
+            modelDefs.put(m.id(), m);
+        }
         for (var def : config.agents().list()) {
-            validateConfig(def);
-            var agent = buildAgent(def);
+            var modelDef = resolveModelDef(def);
+            validateConfig(def, modelDef);
+            var agent = buildAgent(def, modelDef);
             agents.put(def.id(), agent);
             agentDefs.put(def.id(), def);
         }
-        log.info("AgentRegistry initialized: {} agent(s) registered", agents.size());
+        log.info("AgentRegistry initialized: {} agent(s), {} model(s) registered", agents.size(), modelDefs.size());
+    }
+
+    private JClawConfig.ModelDef resolveModelDef(JClawConfig.AgentDef def) {
+        var modelDef = modelDefs.get(def.modelId());
+        if (modelDef == null) {
+            throw new IllegalStateException(
+                    "Agent '%s': references unknown modelId '%s'".formatted(def.id(), def.modelId()));
+        }
+        return modelDef;
     }
 
     /**
      * Validate agent config at startup. Fail fast on misconfiguration.
      */
-    private void validateConfig(JClawConfig.AgentDef def) {
+    private void validateConfig(JClawConfig.AgentDef def, JClawConfig.ModelDef modelDef) {
         if (def.id() == null || def.id().isBlank()) {
             throw new IllegalStateException("Agent config missing 'id'");
         }
-        String provider = def.provider() != null ? def.provider() : "gemini";
+        String provider = modelDef.provider() != null ? modelDef.provider() : "gemini";
         switch (provider) {
             case "gemini" -> {
-                // Gemini reads GOOGLE_API_KEY internally via ADK, just warn if not set
                 String gkey = System.getenv("GOOGLE_API_KEY");
                 if (gkey == null || gkey.isBlank()) {
-                    log.warn("Agent '{}': provider 'gemini' — env var GOOGLE_API_KEY is not set, ADK may fail at runtime", def.id());
+                    log.warn("Agent '{}': model '{}' (gemini) — env var GOOGLE_API_KEY is not set, ADK may fail at runtime",
+                            def.id(), modelDef.id());
                 }
             }
             case "openai", "anthropic" -> {
-                if (def.baseUrl() == null || def.baseUrl().isBlank()) {
+                if (modelDef.baseUrl() == null || modelDef.baseUrl().isBlank()) {
                     throw new IllegalStateException(
-                            "Agent '%s': provider '%s' requires 'baseUrl'".formatted(def.id(), provider));
+                            "Model '%s': provider '%s' requires 'baseUrl'".formatted(modelDef.id(), provider));
                 }
-                if (def.apiKeyEnvVar() == null || def.apiKeyEnvVar().isBlank()) {
+                if (modelDef.apiKeyEnvVar() == null || modelDef.apiKeyEnvVar().isBlank()) {
                     throw new IllegalStateException(
-                            "Agent '%s': provider '%s' requires 'apiKeyEnvVar'".formatted(def.id(), provider));
+                            "Model '%s': provider '%s' requires 'apiKeyEnvVar'".formatted(modelDef.id(), provider));
                 }
-                String apiKey = System.getenv(def.apiKeyEnvVar());
+                String apiKey = System.getenv(modelDef.apiKeyEnvVar());
                 if (apiKey == null || apiKey.isBlank()) {
                     throw new IllegalStateException(
-                            "Agent '%s': env var '%s' is not set".formatted(def.id(), def.apiKeyEnvVar()));
+                            "Model '%s': env var '%s' is not set".formatted(modelDef.id(), modelDef.apiKeyEnvVar()));
                 }
             }
             case "ollama" -> {
-                if (def.baseUrl() == null || def.baseUrl().isBlank()) {
+                if (modelDef.baseUrl() == null || modelDef.baseUrl().isBlank()) {
                     throw new IllegalStateException(
-                            "Agent '%s': provider 'ollama' requires 'baseUrl'".formatted(def.id()));
+                            "Model '%s': provider 'ollama' requires 'baseUrl'".formatted(modelDef.id()));
                 }
             }
             default -> throw new IllegalStateException(
-                    "Agent '%s': unknown provider '%s' (valid: gemini, openai, anthropic, ollama)".formatted(def.id(), provider));
+                    "Model '%s': unknown provider '%s' (valid: gemini, openai, anthropic, ollama)".formatted(modelDef.id(), provider));
         }
-        if (def.model() == null || def.model().isBlank()) {
-            throw new IllegalStateException("Agent '%s': missing 'model'".formatted(def.id()));
+        if (modelDef.model() == null || modelDef.model().isBlank()) {
+            throw new IllegalStateException("Model '%s': missing 'model'".formatted(modelDef.id()));
         }
-        log.debug("Agent '{}' config validated: provider={}, model={}", def.id(), provider, def.model());
+        log.debug("Agent '{}' config validated: modelId={}, provider={}, model={}",
+                def.id(), modelDef.id(), provider, modelDef.model());
     }
 
-    private BaseAgent buildAgent(JClawConfig.AgentDef def) {
-        String model = def.model() != null ? def.model() : "gemini-2.5-flash";
-        BaseLlm resolvedLlm = resolveLlm(def, model);
+    private BaseAgent buildAgent(JClawConfig.AgentDef def, JClawConfig.ModelDef modelDef) {
+        String model = modelDef.model();
+        BaseLlm resolvedLlm = resolveLlm(def, modelDef);
 
         String instruction = def.instruction() != null ? def.instruction() : "You are a helpful assistant.";
         instruction = injectSkillCatalog(instruction, def);
@@ -113,21 +129,15 @@ public final class AgentRegistry {
             builder.model(model);
         }
 
-        log.info("Built agent '{}' with model: {}", def.id(), model);
+        log.info("Built agent '{}' with modelId={}, model={}", def.id(), modelDef.id(), model);
         return builder.build();
     }
 
-    /**
-     * Resolve the LLM based on provider config.
-     * - gemini → Gemini native (return null, use model string)
-     * - ollama → Ollama client via LangChain4j
-     * - anthropic → Anthropic native API via LangChain4j
-     * - openai (default for baseUrl) → OpenAI-compatible via LangChain4j
-     */
-    private BaseLlm resolveLlm(JClawConfig.AgentDef def, String model) {
-        String provider = def.provider() != null ? def.provider() : "gemini";
-        String apiKey = resolveApiKey(def);
-        String baseUrl = def.baseUrl();
+    private BaseLlm resolveLlm(JClawConfig.AgentDef def, JClawConfig.ModelDef modelDef) {
+        String provider = modelDef.provider() != null ? modelDef.provider() : "gemini";
+        String model = modelDef.model();
+        String apiKey = resolveApiKey(modelDef);
+        String baseUrl = modelDef.baseUrl();
 
         return switch (provider) {
             case "gemini" -> {
@@ -135,51 +145,29 @@ public final class AgentRegistry {
                 yield null;
             }
             case "ollama" -> {
-                if (baseUrl == null || baseUrl.isBlank()) {
-                    throw new IllegalStateException(
-                            "Agent '%s': provider 'ollama' requires baseUrl".formatted(def.id()));
-                }
                 log.info("Agent '{}': using Ollama at {}, model={}", def.id(), baseUrl, model);
                 yield new LangChain4j(
                         OllamaChatModel.builder().modelName(model).baseUrl(baseUrl).build());
             }
             case "anthropic" -> {
-                requireApiKey(def, apiKey, model);
-                if (baseUrl == null || baseUrl.isBlank()) {
-                    throw new IllegalStateException(
-                            "Agent '%s': provider 'anthropic' requires baseUrl".formatted(def.id()));
-                }
                 log.info("Agent '{}': using Anthropic at {}, model={}", def.id(), baseUrl, model);
                 yield new LangChain4j(
                         AnthropicChatModel.builder().apiKey(apiKey).modelName(model).baseUrl(baseUrl).build(),
                         model);
             }
             case "openai" -> {
-                requireApiKey(def, apiKey, model);
-                if (baseUrl == null || baseUrl.isBlank()) {
-                    throw new IllegalStateException(
-                            "Agent '%s': provider 'openai' requires baseUrl".formatted(def.id()));
-                }
                 log.info("Agent '{}': using OpenAI-compatible at {}, model={}", def.id(), baseUrl, model);
                 yield new LangChain4j(
                         OpenAiChatModel.builder().apiKey(apiKey).modelName(model).baseUrl(baseUrl).build());
             }
             default -> throw new IllegalStateException(
-                    "Agent '%s': unknown provider '%s'".formatted(def.id(), provider));
+                    "Model '%s': unknown provider '%s'".formatted(modelDef.id(), provider));
         };
     }
 
-    private String resolveApiKey(JClawConfig.AgentDef def) {
-        if (def.apiKeyEnvVar() == null || def.apiKeyEnvVar().isBlank()) return null;
-        return System.getenv(def.apiKeyEnvVar());
-    }
-
-    private void requireApiKey(JClawConfig.AgentDef def, String apiKey, String model) {
-        if (apiKey == null || apiKey.isBlank()) {
-            throw new IllegalStateException(
-                    "Agent '%s' uses model '%s' but API key is not set (env var: %s)"
-                            .formatted(def.id(), model, def.apiKeyEnvVar()));
-        }
+    private String resolveApiKey(JClawConfig.ModelDef modelDef) {
+        if (modelDef.apiKeyEnvVar() == null || modelDef.apiKeyEnvVar().isBlank()) return null;
+        return System.getenv(modelDef.apiKeyEnvVar());
     }
 
     public BaseAgent getAgent(String agentId) {
@@ -206,7 +194,8 @@ public final class AgentRegistry {
             log.info("Skills changed (version {} → {}), rebuilding agents...", lastSkillVersion, current);
             lastSkillVersion = current;
             for (var entry : agentDefs.entrySet()) {
-                agents.put(entry.getKey(), buildAgent(entry.getValue()));
+                var modelDef = resolveModelDef(entry.getValue());
+                agents.put(entry.getKey(), buildAgent(entry.getValue(), modelDef));
             }
         }
     }
